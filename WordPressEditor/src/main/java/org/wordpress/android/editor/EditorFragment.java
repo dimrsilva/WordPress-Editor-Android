@@ -15,6 +15,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.ToggleButton;
 
 import com.android.volley.toolbox.ImageLoader;
 
@@ -27,8 +28,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Arrays;
 
-public class EditorFragment extends EditorFragmentAbstract {
+public class EditorFragment extends EditorFragmentAbstract implements View.OnClickListener {
     private static final String ARG_PARAM_TITLE = "param_title";
     private static final String ARG_PARAM_CONTENT = "param_content";
 
@@ -37,6 +39,8 @@ public class EditorFragment extends EditorFragmentAbstract {
     private String mParamTitle;
     private String mParamContent;
     private WebView mWebView;
+
+    private ToggleButton mBoldButton;
 
     public static EditorFragment newInstance(String title, String content) {
         EditorFragment fragment = new EditorFragment();
@@ -65,6 +69,10 @@ public class EditorFragment extends EditorFragmentAbstract {
         View view = inflater.inflate(R.layout.fragment_editor, container, false);
         mWebView = (WebView) view.findViewById(R.id.webview);
         initWebView();
+
+        mBoldButton = (ToggleButton) view.findViewById(R.id.bold);
+        mBoldButton.setOnClickListener(this);
+
         return view;
     }
 
@@ -109,6 +117,14 @@ public class EditorFragment extends EditorFragmentAbstract {
 
         enableWebDebugging(true);
     }
+
+    @Override
+    public void onClick(View v) {
+        int id = v.getId();
+        if (id == R.id.bold) {
+            execJavaScriptFromString("ZSSEditor.setBold();");
+        }
+    };
 
     private String getStringFromAsset(String filename) throws IOException {
         if (!isAdded()) {
@@ -182,23 +198,58 @@ public class EditorFragment extends EditorFragmentAbstract {
         return null;
     }
 
-    class JsCallbackHandler {
-        @JavascriptInterface
-        public void executeCallback(final String callbackId) {
-            if (callbackId.equals("callback-dom-loaded")) {
-                // Run on UI thread
-                mWebView.post(new Runnable() {
-                    public void run() {
-                        String title = "I'm editing a post!";
-                        String contentHtml = getHtmlFromFile("example-content.html");
+    private void execJavaScriptFromString(String javaScript) {
 
-                        // Load example content into editor
-                        mWebView.loadUrl("javascript:ZSSEditor.getField('zss_field_title').setHTML('" +
-                                Utils.escapeHtml(title) + "');");
-                        mWebView.loadUrl("javascript:ZSSEditor.getField('zss_field_content').setHTML('" +
-                                Utils.escapeHtml(contentHtml) + "');");
-                    }
-                });
+        mWebView.loadUrl("javascript:" + javaScript);
+    }
+
+    class JsCallbackHandler {
+        private final String CALLBACK_LOG = "callback-log";
+
+        private final String CALLBACK_DOM_LOADED = "callback-dom-loaded";
+
+        private final String CALLBACK_SELECTION_STYLE = "callback-selection-style";
+
+        @JavascriptInterface
+        public void executeCallback(final String callbackId, final String params) {
+            switch (callbackId) {
+                case CALLBACK_DOM_LOADED:
+                    // Run on UI thread
+                    mWebView.post(new Runnable() {
+                        public void run() {
+                            String title = "I'm editing a post!";
+                            String contentHtml = getHtmlFromFile("example-content.html");
+
+                            // Load example content into editor
+                            execJavaScriptFromString("ZSSEditor.getField('zss_field_title').setHTML('" +
+                                    Utils.escapeHtml(title) + "');");
+                            execJavaScriptFromString("ZSSEditor.getField('zss_field_content').setHTML('" +
+                                    Utils.escapeHtml(contentHtml) + "');");
+                        }
+                    });
+                    break;
+                case CALLBACK_SELECTION_STYLE:
+                    mWebView.post(new Runnable() {
+                        public void run() {
+                            boolean bold = false;
+                            String[] paramsArray = params.split("~");
+                            for (String param : paramsArray) {
+                                if (param.equals("bold")) {
+                                    mBoldButton.setChecked(true);
+                                    bold = true;
+                                }
+                            }
+                            if (!bold) {
+                                mBoldButton.setChecked(false);
+                            }
+                        }
+                    });
+                    break;
+                case CALLBACK_LOG:
+                    AppLog.d(T.EDITOR, callbackId + ": " + params.substring(4));
+                    break;
+                default:
+                    AppLog.d(T.EDITOR, "unhandled callback: " + callbackId + ":" + params);
             }
         }
     }
