@@ -1,6 +1,7 @@
 package org.wordpress.android.editor;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.res.AssetManager;
 import android.os.Build;
 import android.os.Bundle;
@@ -8,6 +9,7 @@ import android.text.Spanned;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
 import android.webkit.JsResult;
@@ -28,7 +30,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Arrays;
 
 public class EditorFragment extends EditorFragmentAbstract implements View.OnClickListener {
     private static final String ARG_PARAM_TITLE = "param_title";
@@ -38,7 +39,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
 
     private String mParamTitle;
     private String mParamContent;
-    private WebView mWebView;
+    private EditorWebView mWebView;
 
     private ToggleButton mBoldButton;
 
@@ -67,7 +68,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_editor, container, false);
-        mWebView = (WebView) view.findViewById(R.id.webview);
+        mWebView = (EditorWebView) view.findViewById(R.id.webview);
         initWebView();
 
         mBoldButton = (ToggleButton) view.findViewById(R.id.bold);
@@ -123,6 +124,25 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
         int id = v.getId();
         if (id == R.id.bold) {
             execJavaScriptFromString("ZSSEditor.setBold();");
+
+            // Disable suggestions when bold (testing code only, needs to actually be context-aware, only hiding
+            // suggestions if formatting is being applied inside a word (e.g. sometext_bold_ or _allbold_notbold)
+            if (mBoldButton.isChecked()) {
+                mWebView.hideSuggestions(true);
+            } else {
+                mWebView.hideSuggestions(false);
+            }
+
+            InputMethodManager inputMethodManager = (InputMethodManager) getActivity().
+                    getSystemService(Context.INPUT_METHOD_SERVICE);
+            inputMethodManager.restartInput(mWebView);
+            // Clearing the anchored text seems to allow in-word bolding for custom keyboards (e.g. Swype),
+            // but this needs more testing. inputMethodManager.updateSelection should be called every time an input is
+            // made while (absorb callback-input) the current word has formatting, and updated with the current
+            // x-position of the cursor
+            inputMethodManager.updateSelection(mWebView, 20, 20, 20, 20);
+            // Keeps the keyboard in place on API 18
+            inputMethodManager.showSoftInput(mWebView, 0);
         }
     };
 
