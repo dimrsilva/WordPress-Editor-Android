@@ -29,13 +29,17 @@ public class EditorExampleActivity extends AppCompatActivity implements EditorFr
     public static final int USE_NEW_EDITOR = 1;
     public static final int USE_LEGACY_EDITOR = 2;
 
-    public static final int ADD_MEDIA_ACTIVITY_REQUEST_CODE = 1111;
-    public static final int ADD_MEDIA_FAIL_ACTIVITY_REQUEST_CODE = 1112;
+    public static final int ADD_MEDIA_ACTIVITY_IMAGE_REQUEST_CODE = 1111;
+    public static final int ADD_MEDIA_FAIL_ACTIVITY_IMAGE_REQUEST_CODE = 1112;
+    public static final int ADD_MEDIA_ACTIVITY_VIDEO_REQUEST_CODE = 1113;
+    public static final int ADD_MEDIA_FAIL_ACTIVITY_VIDEO_REQUEST_CODE = 1114;
 
     public static final String MEDIA_REMOTE_ID_SAMPLE = "123";
 
     private static final int SELECT_PHOTO_MENU_POSITION = 0;
     private static final int SELECT_PHOTO_FAIL_MENU_POSITION = 1;
+    private static final int SELECT_VIDEO_MENU_POSITION = 2;
+    private static final int SELECT_VIDEO_FAIL_MENU_POSITION = 3;
 
     private EditorFragmentAbstract mEditorFragment;
 
@@ -78,6 +82,8 @@ public class EditorExampleActivity extends AppCompatActivity implements EditorFr
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenu.ContextMenuInfo menuInfo) {
         menu.add(0, SELECT_PHOTO_MENU_POSITION, 0, getString(R.string.select_photo));
         menu.add(0, SELECT_PHOTO_FAIL_MENU_POSITION, 0, getString(R.string.select_photo_fail));
+        menu.add(0, SELECT_VIDEO_MENU_POSITION, 0, getString(R.string.select_video));
+        menu.add(0, SELECT_VIDEO_FAIL_MENU_POSITION, 0, getString(R.string.select_video_fail));
     }
 
     @Override
@@ -90,14 +96,28 @@ public class EditorExampleActivity extends AppCompatActivity implements EditorFr
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 intent = Intent.createChooser(intent, getString(R.string.select_photo));
 
-                startActivityForResult(intent, ADD_MEDIA_ACTIVITY_REQUEST_CODE);
+                startActivityForResult(intent, ADD_MEDIA_ACTIVITY_IMAGE_REQUEST_CODE);
                 return true;
             case SELECT_PHOTO_FAIL_MENU_POSITION:
                 intent.setType("image/*");
                 intent.setAction(Intent.ACTION_GET_CONTENT);
                 intent = Intent.createChooser(intent, getString(R.string.select_photo_fail));
 
-                startActivityForResult(intent, ADD_MEDIA_FAIL_ACTIVITY_REQUEST_CODE);
+                startActivityForResult(intent, ADD_MEDIA_FAIL_ACTIVITY_IMAGE_REQUEST_CODE);
+                return true;
+            case SELECT_VIDEO_MENU_POSITION:
+                intent.setType("video/*");
+                intent.setAction(Intent.ACTION_GET_CONTENT);
+                intent = Intent.createChooser(intent, getString(R.string.select_photo));
+
+                startActivityForResult(intent, ADD_MEDIA_ACTIVITY_VIDEO_REQUEST_CODE);
+                return true;
+            case SELECT_VIDEO_FAIL_MENU_POSITION:
+                intent.setType("video/*");
+                intent.setAction(Intent.ACTION_GET_CONTENT);
+                intent = Intent.createChooser(intent, getString(R.string.select_photo_fail));
+
+                startActivityForResult(intent, ADD_MEDIA_FAIL_ACTIVITY_VIDEO_REQUEST_CODE);
                 return true;
             default:
                 return false;
@@ -119,14 +139,29 @@ public class EditorExampleActivity extends AppCompatActivity implements EditorFr
         mediaFile.setMediaId(mediaId);
 
         switch (requestCode) {
-            case ADD_MEDIA_ACTIVITY_REQUEST_CODE:
+            case ADD_MEDIA_ACTIVITY_IMAGE_REQUEST_CODE:
                 mEditorFragment.appendMediaFile(mediaFile, imageUri.toString(), null);
 
                 if (mEditorFragment instanceof EditorMediaUploadListener) {
                     simulateFileUpload(mediaId, imageUri.toString());
                 }
                 break;
-            case ADD_MEDIA_FAIL_ACTIVITY_REQUEST_CODE:
+            case ADD_MEDIA_FAIL_ACTIVITY_IMAGE_REQUEST_CODE:
+                mEditorFragment.appendMediaFile(mediaFile, imageUri.toString(), null);
+
+                if (mEditorFragment instanceof EditorMediaUploadListener) {
+                    simulateFileUploadFail(mediaId, imageUri.toString());
+                }
+            case ADD_MEDIA_ACTIVITY_VIDEO_REQUEST_CODE:
+                mediaFile.setVideo(true); // might be unnecessary
+                mEditorFragment.appendMediaFile(mediaFile, imageUri.toString(), null);
+
+                if (mEditorFragment instanceof EditorMediaUploadListener) {
+                    simulateFileUpload(mediaId, imageUri.toString());
+                }
+                break;
+            case ADD_MEDIA_FAIL_ACTIVITY_VIDEO_REQUEST_CODE:
+                mediaFile.setVideo(true); // might be unnecessary
                 mEditorFragment.appendMediaFile(mediaFile, imageUri.toString(), null);
 
                 if (mEditorFragment instanceof EditorMediaUploadListener) {

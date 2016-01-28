@@ -94,7 +94,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
 
     private ConcurrentHashMap<String, MediaFile> mWaitingMediaFiles;
     private Set<MediaGallery> mWaitingGalleries;
-    private Set<String> mUploadingMediaIds;
+    private Map<String, String> mUploadingMediaIds;
     private Set<String> mFailedMediaIds;
     private MediaGallery mUploadingMediaGallery;
 
@@ -135,7 +135,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
 
         mWaitingMediaFiles = new ConcurrentHashMap<>();
         mWaitingGalleries = Collections.newSetFromMap(new ConcurrentHashMap<MediaGallery, Boolean>());
-        mUploadingMediaIds = new HashSet<>();
+        mUploadingMediaIds = new HashMap<>();
         mFailedMediaIds = new HashSet<>();
 
         // -- WebView configuration
@@ -232,7 +232,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
     @Override
     public void onDetach() {
         // Soft cancel (delete flag off) all media uploads currently in progress
-        for (String mediaId : mUploadingMediaIds) {
+        for (String mediaId : mUploadingMediaIds.keySet()) {
             mEditorFragmentListener.onMediaUploadCancelClicked(mediaId, false);
         }
         super.onDetach();
@@ -739,14 +739,30 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
             public void run() {
                 if (URLUtil.isNetworkUrl(mediaUrl)) {
                     String mediaId = mediaFile.getMediaId();
-                    mWebView.execJavaScriptFromString("ZSSEditor.insertImage('" + mediaUrl + "', '" + mediaId + "');");
-                    AnalyticsTracker.track(Stat.EDITOR_ADDED_PHOTO_VIA_WP_MEDIA_LIBRARY);
+                    if (mediaFile.isVideo()) {
+                        mWebView.execJavaScriptFromString("ZSSEditor.insertInProgressVideoWithIDUsingPosterImage('" + mediaId +
+                                "');");
+                        mWebView.execJavaScriptFromString("ZSSEditor.replaceLocalVideoWithRemoteVideo('" + mediaId +
+                                "', '" + mediaUrl + "');");
+                    } else {
+                        mWebView.execJavaScriptFromString("ZSSEditor.insertImage('" + mediaUrl + "', '" + mediaId +
+                                "');");
+                        AnalyticsTracker.track(Stat.EDITOR_ADDED_PHOTO_VIA_WP_MEDIA_LIBRARY);
+                    }
                 } else {
                     String id = mediaFile.getMediaId();
-                    mWebView.execJavaScriptFromString("ZSSEditor.insertLocalImage(" + id + ", '" + mediaUrl + "');");
-                    mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnImage(" + id + ", " + 0 + ");");
-                    mUploadingMediaIds.add(id);
-                    AnalyticsTracker.track(Stat.EDITOR_ADDED_PHOTO_VIA_LOCAL_LIBRARY);
+                    if (mediaFile.isVideo()) {
+                        //mWebView.execJavaScriptFromString("ZSSEditor.insertVideo('" + mediaUrl + "', 'wpposter.svg');");
+                        mWebView.execJavaScriptFromString("ZSSEditor.insertInProgressVideoWithIDUsingPosterImage('" + id +
+                                    "', '" + mediaUrl + "', 'wpposter.svg');");
+                        //mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnVideo(" + id + ", " + 0 + ");");
+                        mUploadingMediaIds.put(id, "video");
+                    } else {
+                        mWebView.execJavaScriptFromString("ZSSEditor.insertLocalImage(" + id + ", '" + mediaUrl + "')" +
+                                ";");
+                        mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnImage(" + id + ", " + 0 + ");");
+                        mUploadingMediaIds.put(id, "image");
+                        AnalyticsTracker.track(Stat.EDITOR_ADDED_PHOTO_VIA_LOCAL_LIBRARY);
                 }
             }
         });
@@ -810,8 +826,13 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
         mWebView.post(new Runnable() {
             @Override
             public void run() {
-                mWebView.execJavaScriptFromString("ZSSEditor.replaceLocalImageWithRemoteImage(" + mediaId + ", '" +
-                        remoteId + "', '" + remoteUrl + "');");
+                if (mUploadingMediaIds.get(mediaId).equals("video")) {
+                    mWebView.execJavaScriptFromString("ZSSEditor.replaceLocalVideoWithRemoteVideo('" + mediaId +
+                            "', '" + remoteUrl + "', '');");
+                } else {
+                    mWebView.execJavaScriptFromString("ZSSEditor.replaceLocalImageWithRemoteImage(" + mediaId + ", '" +
+                            remoteId + "', '" + remoteUrl + "');");
+                }
                 mUploadingMediaIds.remove(mediaId);
             }
         });
@@ -823,8 +844,13 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
             @Override
             public void run() {
                 String progressString = String.format(Locale.US, "%.1f", progress);
-                mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnImage(" + mediaId + ", " +
-                        progressString + ");");
+                if (mUploadingMediaIds.get(mediaId).equals("video")) {
+                    mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnVideo(" + mediaId + ", " +
+                            progressString + ");");
+                } else {
+                    mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnImage(" + mediaId + ", " +
+                            progressString + ");");
+                }
             }
         });
     }
@@ -997,7 +1023,7 @@ public class EditorFragment extends EditorFragmentAbstract implements View.OnCli
                         mWebView.execJavaScriptFromString("ZSSEditor.unmarkImageUploadFailed(" + mediaId + ");");
                         mWebView.execJavaScriptFromString("ZSSEditor.setProgressOnImage(" + mediaId + ", " + 0 + ");");
                         mFailedMediaIds.remove(mediaId);
-                        mUploadingMediaIds.add(mediaId);
+                        mUploadingMediaIds.put(mediaId, "image");
                     }
                 });
                 break;
